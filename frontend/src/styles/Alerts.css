@@ -1,0 +1,165 @@
+.alerts-page {
+  animation: fadeIn 0.3s ease;
+}
+
+.content-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.header-actions {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.filter-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.filter-buttons .btn {
+  border: 2px solid var(--border-color);
+  background: white;
+  color: var(--dark-text);
+}
+
+.filter-buttons .btn.active {
+  background: var(--primary-color);
+  color: white;
+  border-color: var(--primary-color);
+}
+
+.alerts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 20px;
+}
+
+.alert-card {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  border-left: 5px solid;
+  transition: transform 0.3s;
+}
+
+.alert-card:hover {
+  transform: translateY(-5px);
+}
+
+.alert-card.critical {
+  border-color: var(--danger-color);
+}
+
+.alert-card.warning {
+  border-color: var(--warning-color);
+}
+
+.alert-card.info {
+  border-color: var(--info-color);
+}
+
+.alert-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.badge {
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.badge.critical {
+  background: rgba(231, 76, 60, 0.1);
+  color: var(--danger-color);
+}
+
+.badge.warning {
+  background: rgba(243, 156, 18, 0.1);
+  color: var(--warning-color);
+}
+
+.badge.info {
+  background: rgba(52, 152, 219, 0.1);
+  color: var(--info-color);
+}
+
+.status {
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.status.active {
+  background: rgba(231, 76, 60, 0.1);
+  color: var(--danger-color);
+}
+
+.status.resolved {
+  background: rgba(39, 174, 96, 0.1);
+  color: var(--success-color);
+}
+
+.alert-card h3 {
+  font-size: 18px;
+  margin-bottom: 10px;
+  color: var(--dark-text);
+}
+
+.alert-card p {
+  font-size: 14px;
+  color: var(--light-text);
+  margin-bottom: 15px;
+  line-height: 1.6;
+}
+
+.alert-meta {
+  display: flex;
+  gap: 15px;
+  font-size: 13px;
+  color: var(--light-text);
+  margin-bottom: 15px;
+}
+
+.alert-actions {
+  display: flex;
+  gap: 10px;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 768px) {
+  .alerts-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .content-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .filter-buttons {
+    flex-wrap: wrap;
+  }
+}
