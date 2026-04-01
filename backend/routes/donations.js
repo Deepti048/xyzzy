@@ -1,5 +1,6 @@
 const express = require('express');
 const crypto = require('crypto');
+const QRCode = require('qrcode');
 const db = require('../config/db');
 const { auth } = require('../middleware/auth');
 
@@ -43,47 +44,78 @@ router.get('/config', auth, (req, res) => {
 // Create donation order
 router.post('/create-order', auth, async (req, res) => {
     try {
-        const { amount, donor_name, donor_email, disaster_report_id, message } = req.body;
+        const { amount, donor_name, donor_email, disaster_report_id, message, payment_method } = req.body;
 
-        const rz = getRazorpay();
-        if (!rz) {
-            // If Razorpay not configured, create a mock donation record
+        if (payment_method === 'upi') {
+            // Handle UPI payment
+            const upiId = process.env.UPI_ID || 'crisismanagement@upi';
+            const upiName = process.env.UPI_NAME || 'Crisis Management';
+            const reference = `DonUPI${Date.now()}`;
+
+            // Generate UPI string and QR code
+            const upiString = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(upiName)}&tr=${reference}&tn=Donation&am=${amount}`;
+            const qrCode = await QRCode.toDataURL(upiString);
+
+            // Insert donation record with UPI details (status = 'created' - waiting for payment)
             const [result] = await db.query(
-                'INSERT INTO donations (donor_name, donor_email, amount, razorpay_order_id, disaster_report_id, message, status) VALUES (?, ?, ?, ?, ?, ?, "paid")',
-                [donor_name, donor_email, amount, 'mock_' + Date.now(), disaster_report_id || null, message || null]
+                'INSERT INTO donations (donor_name, donor_email, amount, disaster_report_id, message, payment_method, upi_reference, status) VALUES (?, ?, ?, ?, ?, ?, ?, "created")',
+                [donor_name, donor_email, amount, disaster_report_id || null, message || null, 'upi', reference]
             );
-
-            const io = req.app.get('io');
-            io.emit('donation:received', { amount, donor_name });
 
             return res.json({
                 success: true,
-                mock: true,
-                message: 'Donation recorded (Razorpay not configured - test mode)',
+                upiDetails: {
+                    upiId: upiId,
+                    upiName: upiName,
+                    amount: amount,
+                    reference: reference,
+                    qrCode: qrCode,
+                    upiLink: upiString
+                },
+                donationId: result.insertId
+            });
+        } else {
+            // Handle Razorpay payment (existing logic)
+            const rz = getRazorpay();
+            if (!rz) {
+                // If Razorpay not configured, create a mock donation record
+                const [result] = await db.query(
+                    'INSERT INTO donations (donor_name, donor_email, amount, razorpay_order_id, disaster_report_id, message, payment_method, status) VALUES (?, ?, ?, ?, ?, ?, ?, "paid")',
+                    [donor_name, donor_email, amount, 'mock_' + Date.now(), disaster_report_id || null, message || null, 'razorpay']
+                );
+
+                const io = req.app.get('io');
+                io.emit('donation:received', { amount, donor_name, method: 'razorpay' });
+
+                return res.json({
+                    success: true,
+                    mock: true,
+                    message: 'Donation recorded (Razorpay not configured - test mode)',
+                    donationId: result.insertId
+                });
+            }
+
+            const options = {
+                amount: Math.round(amount * 100), // paise
+                currency: 'INR',
+                receipt: `donation_${Date.now()}`
+            };
+
+            const order = await rz.orders.create(options);
+
+            const [result] = await db.query(
+                'INSERT INTO donations (donor_name, donor_email, amount, razorpay_order_id, disaster_report_id, message, payment_method) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                [donor_name, donor_email, amount, order.id, disaster_report_id || null, message || null, 'razorpay']
+            );
+
+            res.json({
+                orderId: order.id,
+                amount: order.amount,
+                currency: order.currency,
+                key_id: process.env.RAZORPAY_KEY_ID,
                 donationId: result.insertId
             });
         }
-
-        const options = {
-            amount: Math.round(amount * 100), // paise
-            currency: 'INR',
-            receipt: `donation_${Date.now()}`
-        };
-
-        const order = await rz.orders.create(options);
-
-        const [result] = await db.query(
-            'INSERT INTO donations (donor_name, donor_email, amount, razorpay_order_id, disaster_report_id, message) VALUES (?, ?, ?, ?, ?, ?)',
-            [donor_name, donor_email, amount, order.id, disaster_report_id || null, message || null]
-        );
-
-        res.json({
-            orderId: order.id,
-            amount: order.amount,
-            currency: order.currency,
-            key_id: process.env.RAZORPAY_KEY_ID,
-            donationId: result.insertId
-        });
     } catch (error) {
         console.error('Create order error:', error);
         res.status(500).json({ error: 'Failed to create donation order' });
@@ -120,6 +152,52 @@ router.post('/verify', auth, async (req, res) => {
     } catch (error) {
         console.error('Verify payment error:', error);
         res.status(500).json({ error: 'Payment verification failed' });
+    }
+});
+
+// Verify UPI payment (for manual verification)
+router.post('/verify-upi', auth, async (req, res) => {
+    try {
+        const { donationId, upiReference } = req.body;
+
+        // Update the donation to mark as paid
+        const [result] = await db.query(
+            'UPDATE donations SET status = "paid" WHERE id = ? AND upi_reference = ? AND payment_method = "upi"',
+            [donationId, upiReference]
+        );
+
+        if (result.affectedRows > 0) {
+            // Get the donation details after update
+            const [donation] = await db.query(
+                'SELECT * FROM donations WHERE id = ?',
+                [donationId]
+            );
+
+            if (donation && donation.length > 0) {
+                const io = req.app.get('io');
+                io.emit('donation:received', {
+                    amount: donation[0].amount,
+                    donor_name: donation[0].donor_name,
+                    method: 'upi',
+                    reference: donation[0].upi_reference
+                });
+
+                return res.json({
+                    success: true,
+                    status: 'paid',
+                    message: '✅ UPI donation verified successfully',
+                    donation: donation[0]
+                });
+            }
+        }
+
+        res.status(404).json({
+            success: false,
+            error: 'Donation not found or already verified'
+        });
+    } catch (error) {
+        console.error('Verify UPI payment error:', error);
+        res.status(500).json({ error: 'Verification failed' });
     }
 });
 

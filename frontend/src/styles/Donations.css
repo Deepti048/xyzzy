@@ -2,6 +2,52 @@
     animation: fadeIn 0.3s ease;
 }
 
+/* Success Banner Styles */
+.success-banner {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+    padding: 16px 20px;
+    border-radius: 8px;
+    margin-bottom: 25px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    animation: slideDownBounce 0.4s ease;
+}
+
+@keyframes slideDownBounce {
+    0% {
+        transform: translateY(-20px);
+        opacity: 0;
+    }
+    100% {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.success-content {
+    font-size: 15px;
+    font-weight: 500;
+    flex: 1;
+}
+
+.close-banner {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 20px;
+    cursor: pointer;
+    opacity: 0.8;
+    transition: opacity 0.3s;
+    padding: 0 8px;
+}
+
+.close-banner:hover {
+    opacity: 1;
+}
+
 .donation-stats {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -132,6 +178,23 @@
     background: var(--light-bg);
 }
 
+.donations-table tr.newly-added {
+    background: linear-gradient(90deg, rgba(16, 185, 129, 0.15), transparent);
+    border-left: 4px solid var(--success-color);
+    animation: highlightFade 3s ease-in-out;
+}
+
+@keyframes highlightFade {
+    0% {
+        background: linear-gradient(90deg, rgba(16, 185, 129, 0.4), transparent);
+        border-left: 4px solid var(--success-color);
+    }
+    100% {
+        background: linear-gradient(90deg, rgba(16, 185, 129, 0.15), transparent);
+        border-left: 4px solid var(--success-color);
+    }
+}
+
 .donor-info {
     display: flex;
     align-items: center;
@@ -194,5 +257,327 @@
 
     .donation-stats {
         grid-template-columns: 1fr;
+    }
+}
+
+/* Payment Methods Styles */
+.payment-methods {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 10px;
+}
+
+.payment-option {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 15px;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s;
+    background: white;
+}
+
+.payment-option input[type="radio"] {
+    cursor: pointer;
+    width: 18px;
+    height: 18px;
+    accent-color: var(--primary-color);
+}
+
+.payment-option-label {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--dark-text);
+    cursor: pointer;
+}
+
+.payment-option:has(input:checked) {
+    border-color: var(--primary-color);
+    background: rgba(52, 73, 94, 0.05);
+}
+
+/* UPI Modal Styles */
+.upi-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    animation: fadeIn 0.3s ease;
+}
+
+.upi-modal {
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    max-width: 500px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    position: relative;
+    animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.upi-close-btn {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: var(--light-text);
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.3s;
+    z-index: 10;
+}
+
+.upi-close-btn:hover {
+    background: var(--light-bg);
+    color: var(--dark-text);
+}
+
+.upi-header {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    padding: 25px;
+    text-align: center;
+    border-radius: 16px 16px 0 0;
+}
+
+.upi-header h3 {
+    font-size: 24px;
+    margin: 0 0 8px 0;
+}
+
+.upi-header p {
+    margin: 0;
+    font-size: 14px;
+    opacity: 0.9;
+}
+
+.upi-content {
+    padding: 25px;
+}
+
+.amount-display {
+    text-align: center;
+    padding: 20px;
+    background: linear-gradient(135deg, #f5f7fa, #c3cfe2);
+    border-radius: 12px;
+    margin-bottom: 25px;
+}
+
+.amount-label {
+    font-size: 12px;
+    color: var(--light-text);
+    text-transform: uppercase;
+    margin: 0 0 8px 0;
+}
+
+.amount-value {
+    font-size: 32px;
+    font-weight: bold;
+    color: var(--success-color);
+    margin: 0;
+}
+
+.qr-section {
+    text-align: center;
+    margin-bottom: 25px;
+    padding: 20px;
+    background: var(--light-bg);
+    border-radius: 12px;
+}
+
+.section-title {
+    font-size: 13px;
+    text-transform: uppercase;
+    color: var(--light-text);
+    font-weight: 600;
+    margin-bottom: 15px;
+}
+
+.qr-code-img {
+    width: 200px;
+    height: 200px;
+    border: 3px solid white;
+    border-radius: 8px;
+    object-fit: contain;
+}
+
+.qr-hint {
+    font-size: 12px;
+    color: var(--light-text);
+    margin-top: 12px;
+}
+
+.upi-link-section {
+    margin-bottom: 25px;
+}
+
+.upi-id-section {
+    margin-bottom: 25px;
+    padding: 15px;
+    background: var(--light-bg);
+    border-radius: 12px;
+}
+
+.upi-id-display {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.upi-id {
+    flex: 1;
+    padding: 10px 12px;
+    background: white;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-family: monospace;
+    font-size: 14px;
+    font-weight: 600;
+    word-break: break-all;
+    color: var(--primary-color);
+}
+
+.copy-btn {
+    padding: 8px 16px;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    transition: all 0.3s;
+    white-space: nowrap;
+}
+
+.copy-btn:hover {
+    background: var(--dark-text);
+    transform: scale(1.05);
+}
+
+.section-hint {
+    font-size: 12px;
+    color: var(--light-text);
+    margin: 0;
+}
+
+.upi-instructions {
+    background: #fffacd;
+    border-left: 4px solid var(--warning-color);
+    padding: 15px;
+    border-radius: 6px;
+    margin-bottom: 20px;
+}
+
+.upi-instructions h4 {
+    margin: 0 0 12px 0;
+    font-size: 13px;
+    color: var(--dark-text);
+}
+
+.upi-instructions ol {
+    margin: 0;
+    padding-left: 20px;
+    font-size: 12px;
+    color: var(--light-text);
+}
+
+.upi-instructions li {
+    margin-bottom: 8px;
+    line-height: 1.5;
+}
+
+.upi-instructions strong {
+    color: var(--dark-text);
+    font-weight: 600;
+}
+
+.upi-footer {
+    text-align: center;
+    font-size: 12px;
+    color: var(--light-text);
+    margin: 0;
+}
+
+.upi-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border-color);
+}
+
+.btn-secondary {
+    background: var(--light-bg);
+    color: var(--dark-text);
+    border: 1px solid var(--border-color);
+}
+
+.btn-secondary:hover:not(:disabled) {
+    background: var(--border-color);
+    color: var(--dark-text);
+}
+
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+@media (max-width: 480px) {
+    .upi-modal {
+        width: 95%;
+        max-height: 95vh;
+    }
+
+    .payment-methods {
+        grid-template-columns: 1fr;
+    }
+
+    .qr-code-img {
+        width: 150px;
+        height: 150px;
+    }
+
+    .amount-value {
+        font-size: 24px;
+    }
+
+    .upi-id-display {
+        flex-direction: column;
+    }
+
+    .copy-btn {
+        width: 100%;
     }
 }

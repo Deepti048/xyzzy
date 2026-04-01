@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { donationsAPI, disastersAPI } from '../services/api';
+import socket from '../services/socket';
 import '../styles/Donations.css';
 
 function Donations() {
@@ -13,12 +14,37 @@ function Donations() {
         donor_email: '',
         amount: '',
         disaster_report_id: '',
-        message: ''
+        message: '',
+        payment_method: 'razorpay'
     });
     const [processing, setProcessing] = useState(false);
+    const [upiDetails, setUpiDetails] = useState(null);
+    const [showUpiModal, setShowUpiModal] = useState(false);
+    const [upiConfirming, setUpiConfirming] = useState(false);
+    const [successMessage, setSuccessMessage] = useState('');
 
     useEffect(() => {
         fetchData();
+
+        // Connect to socket and listen for real-time donation updates
+        socket.connect();
+        
+        const socketInstance = socket.socket;
+        if (socketInstance) {
+            socketInstance.on('donation:received', (data) => {
+                console.log('New donation received:', data);
+                // Refresh donations list after a short delay
+                setTimeout(() => {
+                    fetchData();
+                }, 500);
+            });
+        }
+
+        return () => {
+            if (socketInstance) {
+                socketInstance.off('donation:received');
+            }
+        };
     }, []);
 
     const fetchData = async () => {
@@ -42,6 +68,46 @@ function Donations() {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
+    const handleUpiConfirm = async () => {
+        if (!upiDetails) return;
+        
+        setUpiConfirming(true);
+        try {
+            await donationsAPI.verifyUpi({
+                donationId: upiDetails.donationId,
+                upiReference: upiDetails.reference
+            });
+            
+            // Show success message
+            setSuccessMessage(`✅ Payment Confirmed! Your donation of ${formatCurrency(upiDetails.amount)} has been recorded.`);
+            
+            // Close modal and form
+            setShowUpiModal(false);
+            setUpiDetails(null);
+            setFormData(prev => ({ ...prev, donor_name: '', donor_email: '', amount: '', disaster_report_id: '', message: '', payment_method: 'razorpay' }));
+            setShowForm(false);
+            
+            // Fetch and update donations list
+            await fetchData();
+            
+            // Auto dismiss success message after 5 seconds
+            setTimeout(() => {
+                setSuccessMessage('');
+            }, 5000);
+            
+            // Scroll to donations list
+            setTimeout(() => {
+                document.querySelector('.donations-list')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 300);
+        } catch (err) {
+            console.error('UPI confirmation error:', err);
+            setSuccessMessage('');
+            alert('⚠️ Could not confirm payment. Please try again or contact support.');
+        } finally {
+            setUpiConfirming(false);
+        }
+    };
+
     const handleDonate = async (e) => {
         e.preventDefault();
         setProcessing(true);
@@ -52,11 +118,22 @@ function Donations() {
                 amount: parseFloat(formData.amount)
             });
 
-            if (res.data.mock) {
+            if (formData.payment_method === 'upi') {
+                // Handle UPI payment
+                if (res.data.upiDetails) {
+                    setUpiDetails({
+                        ...res.data.upiDetails,
+                        donationId: res.data.donationId
+                    });
+                    setShowUpiModal(true);
+                    setFormData(prev => ({ ...prev, donor_name: '', donor_email: '', amount: '', disaster_report_id: '', message: '', payment_method: 'razorpay' }));
+                    setShowForm(false);
+                }
+            } else if (res.data.mock) {
                 // Test mode - no Razorpay configured
                 alert('Donation recorded successfully! (Test Mode - Razorpay not configured)');
                 setShowForm(false);
-                setFormData({ donor_name: '', donor_email: '', amount: '', disaster_report_id: '', message: '' });
+                setFormData(prev => ({ ...prev, donor_name: '', donor_email: '', amount: '', disaster_report_id: '', message: '', payment_method: 'razorpay' }));
                 fetchData();
             } else if (res.data.orderId) {
                 // Open Razorpay checkout
@@ -76,7 +153,7 @@ function Donations() {
                             });
                             alert('Donation successful! Thank you for your generosity.');
                             setShowForm(false);
-                            setFormData({ donor_name: '', donor_email: '', amount: '', disaster_report_id: '', message: '' });
+                            setFormData(prev => ({ ...prev, donor_name: '', donor_email: '', amount: '', disaster_report_id: '', message: '', payment_method: 'razorpay' }));
                             fetchData();
                         } catch (err) {
                             alert('Payment verification failed.');
@@ -118,6 +195,15 @@ function Donations() {
                     {showForm ? 'Close Form' : '❤️ Donate Now'}
                 </button>
             </div>
+
+            {successMessage && (
+                <div className="success-banner">
+                    <div className="success-content">
+                        {successMessage}
+                    </div>
+                    <button className="close-banner" onClick={() => setSuccessMessage('')}>✕</button>
+                </div>
+            )}
 
             <div className="donation-stats">
                 <div className="donation-stat-card">
@@ -184,10 +270,99 @@ function Donations() {
                             <label>Message (Optional)</label>
                             <textarea name="message" value={formData.message} onChange={handleChange} rows="2" placeholder="Leave a message of support..." />
                         </div>
+                        <div className="form-group">
+                            <label>Payment Method</label>
+                            <div className="payment-methods">
+                                <label className="payment-option">
+                                    <input type="radio" name="payment_method" value="razorpay" checked={formData.payment_method === 'razorpay'} onChange={handleChange} />
+                                    <span className="payment-option-label">💳 Card / Wallet (Razorpay)</span>
+                                </label>
+                                <label className="payment-option">
+                                    <input type="radio" name="payment_method" value="upi" checked={formData.payment_method === 'upi'} onChange={handleChange} />
+                                    <span className="payment-option-label">📱 UPI Payment</span>
+                                </label>
+                            </div>
+                        </div>
                         <button type="submit" className="btn btn-success btn-block" disabled={processing}>
-                            {processing ? 'Processing...' : `💳 Donate ${formData.amount ? formatCurrency(formData.amount) : ''}`}
+                            {processing ? 'Processing...' : `${formData.payment_method === 'upi' ? '📱 Pay via UPI' : '💳 Proceed to Payment'} ${formData.amount ? formatCurrency(formData.amount) : ''}`}
                         </button>
                     </form>
+                </div>
+            )}
+
+            {showUpiModal && upiDetails && (
+                <div className="upi-modal-overlay" onClick={() => setShowUpiModal(false)}>
+                    <div className="upi-modal" onClick={(e) => e.stopPropagation()}>
+                        <button className="upi-close-btn" onClick={() => setShowUpiModal(false)}>✕</button>
+                        <div className="upi-header">
+                            <h3>📱 UPI Payment</h3>
+                            <p>Pay using your preferred UPI app</p>
+                        </div>
+                        
+                        <div className="upi-content">
+                            <div className="amount-display">
+                                <p className="amount-label">Amount to Pay</p>
+                                <p className="amount-value">{formatCurrency(upiDetails.amount)}</p>
+                            </div>
+
+                            {upiDetails.qrCode && (
+                                <div className="qr-section">
+                                    <p className="section-title">📱 Scan QR Code</p>
+                                    <img src={upiDetails.qrCode} alt="UPI QR Code" className="qr-code-img" />
+                                    <p className="qr-hint">Use any UPI app (Google Pay, PhonePe, WhatsApp Pay, etc.) to scan this code</p>
+                                </div>
+                            )}
+
+                            <div className="upi-id-section">
+                                <p className="section-title">Or Pay Manually</p>
+                                <div className="upi-id-display">
+                                    <span className="upi-id">{upiDetails.upiId}</span>
+                                    <button 
+                                        className="copy-btn" 
+                                        onClick={() => {
+                                            navigator.clipboard.writeText(upiDetails.upiId);
+                                            alert('📋 UPI ID copied to clipboard!');
+                                        }}
+                                    >
+                                        📋 Copy
+                                    </button>
+                                </div>
+                                <p className="section-hint">Reference: <strong>{upiDetails.reference}</strong></p>
+                            </div>
+
+                            <div className="upi-instructions">
+                                <h4>💡 How to Complete Payment</h4>
+                                <ol>
+                                    <li><strong>Option 1:</strong> Scan the QR code with your UPI app</li>
+                                    <li><strong>Option 2:</strong> Copy the UPI ID and send {formatCurrency(upiDetails.amount)} to it</li>
+                                    <li>Complete the payment in your UPI app</li>
+                                    <li>Click "Confirm Payment" below after payment is complete</li>
+                                </ol>
+                            </div>
+
+                            <div className="upi-actions">
+                                <button 
+                                    className="btn btn-success btn-block" 
+                                    onClick={handleUpiConfirm}
+                                    disabled={upiConfirming}
+                                >
+                                    {upiConfirming ? '⏳ Confirming Payment...' : '✅ Confirm Payment'}
+                                </button>
+                                <button 
+                                    className="btn btn-secondary btn-block" 
+                                    onClick={() => {
+                                        setShowUpiModal(false);
+                                        setUpiDetails(null);
+                                    }}
+                                    disabled={upiConfirming}
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+
+                            <p className="upi-footer">Your donation reference: <strong>{upiDetails.reference}</strong></p>
+                        </div>
+                    </div>
                 </div>
             )}
 
@@ -208,8 +383,8 @@ function Donations() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {donations.map(donation => (
-                                    <tr key={donation.id}>
+                                {donations.map((donation, index) => (
+                                    <tr key={donation.id} className={index === 0 && donations.length > 0 ? 'newly-added' : ''}>
                                         <td>
                                             <div className="donor-info">
                                                 <span className="donor-avatar">{donation.donor_name.charAt(0)}</span>

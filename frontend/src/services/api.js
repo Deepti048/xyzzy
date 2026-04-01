@@ -99,6 +99,7 @@ export const donationsAPI = {
     getConfig: () => api.get('/donations/config'),
     createOrder: (data) => api.post('/donations/create-order', data),
     verify: (data) => api.post('/donations/verify', data),
+    verifyUpi: (data) => api.post('/donations/verify-upi', data),
 };
 
 // Intelligence / AI API
