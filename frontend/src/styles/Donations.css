@@ -55,6 +55,72 @@
     margin-bottom: 30px;
 }
 
+.quick-qr-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    padding: 22px;
+    margin-bottom: 24px;
+    border: 1px solid #e5e7eb;
+}
+
+.quick-qr-header h3 {
+    margin: 0 0 6px 0;
+    color: var(--primary-color);
+    font-size: 20px;
+}
+
+.quick-qr-header p {
+    margin: 0 0 16px 0;
+    color: var(--light-text);
+    font-size: 14px;
+}
+
+.quick-qr-controls {
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+    margin-bottom: 16px;
+}
+
+.quick-qr-amount {
+    flex: 1;
+    margin: 0;
+}
+
+.quick-qr-body {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    gap: 20px;
+    align-items: center;
+    background: var(--light-bg);
+    border-radius: 10px;
+    padding: 16px;
+}
+
+.quick-qr-image {
+    width: 210px;
+    height: 210px;
+    object-fit: contain;
+    background: white;
+    border-radius: 10px;
+    border: 1px solid #e5e7eb;
+    padding: 8px;
+}
+
+.quick-qr-meta p {
+    margin: 0 0 10px 0;
+    color: var(--dark-text);
+    font-size: 14px;
+}
+
+.quick-qr-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+}
+
 .donation-stat-card {
     background: white;
     padding: 25px;
@@ -258,6 +324,17 @@
     .donation-stats {
         grid-template-columns: 1fr;
     }
+
+    .quick-qr-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .quick-qr-body {
+        grid-template-columns: 1fr;
+        justify-items: center;
+        text-align: center;
+    }
 }
 
 /* Payment Methods Styles */
@@ -297,6 +374,12 @@
 .payment-option:has(input:checked) {
     border-color: var(--primary-color);
     background: rgba(52, 73, 94, 0.05);
+}
+
+.card-gateway-note {
+    margin-top: 10px;
+    font-size: 13px;
+    color: #92400e;
 }
 
 /* UPI Modal Styles */

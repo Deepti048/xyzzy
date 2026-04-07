@@ -148,7 +148,7 @@ router.get('/proximity', auth, async (req, res) => {
 // ========================================================
 // WEATHER DATA: current weather for a location
 // GET /api/intelligence/weather?lat=X&lng=Y
-// Uses OpenWeatherMap free tier (fallback to mock if no key)
+// Uses OpenWeatherMap free tier
 // ========================================================
 router.get('/weather', auth, async (req, res) => {
     try {
@@ -158,32 +158,22 @@ router.get('/weather', auth, async (req, res) => {
         }
 
         const apiKey = process.env.OPENWEATHER_API_KEY;
-
-        if (apiKey) {
-            const url = `https://api.openweathermap.org/data/2.5/weather?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&appid=${encodeURIComponent(apiKey)}&units=metric`;
-            const data = await fetchJSON(url);
-            return res.json(data);
+        if (!apiKey) {
+            return res.status(503).json({
+                error: 'Weather API key is not configured',
+                config_key: 'OPENWEATHER_API_KEY'
+            });
         }
 
-        // Mock weather data when API key not configured
-        res.json({
-            coord: { lat: parseFloat(lat), lon: parseFloat(lng) },
-            weather: [{ id: 802, main: 'Clouds', description: 'scattered clouds', icon: '03d' }],
-            main: {
-                temp: 28 + Math.random() * 10,
-                feels_like: 30 + Math.random() * 5,
-                humidity: 60 + Math.floor(Math.random() * 30),
-                pressure: 1010 + Math.floor(Math.random() * 10)
-            },
-            wind: {
-                speed: 3 + Math.random() * 8,
-                deg: Math.floor(Math.random() * 360)
-            },
-            visibility: 8000 + Math.floor(Math.random() * 2000),
-            name: 'Local Area',
-            _mock: true,
-            _note: 'Set OPENWEATHER_API_KEY in .env for real weather data'
-        });
+        const url = `https://api.openweathermap.org/data/2.5/weather?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&appid=${encodeURIComponent(apiKey)}&units=metric`;
+        const data = await fetchJSON(url);
+        if (data && String(data.cod) !== '200') {
+            return res.status(502).json({
+                error: 'OpenWeather API request failed',
+                details: data.message || 'Unknown error'
+            });
+        }
+        return res.json(data);
     } catch (error) {
         console.error('Weather fetch error:', error);
         res.status(500).json({ error: 'Failed to fetch weather data' });
@@ -220,17 +210,15 @@ router.get('/risk', auth, async (req, res) => {
         if (apiKey) {
             try {
                 const url = `https://api.openweathermap.org/data/2.5/weather?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&appid=${encodeURIComponent(apiKey)}&units=metric`;
-                weather = await fetchJSON(url);
+                const weatherData = await fetchJSON(url);
+                if (weatherData && String(weatherData.cod) === '200') {
+                    weather = weatherData;
+                } else {
+                    console.error('Weather API error during risk assessment:', weatherData?.message || 'Unknown error');
+                }
             } catch (e) {
                 console.error('Weather API error during risk assessment:', e.message);
             }
-        } else {
-            // Mock weather for risk calculation
-            weather = {
-                main: { temp: 32, humidity: 75 },
-                wind: { speed: 5 },
-                weather: [{ id: 802, main: 'Clouds' }]
-            };
         }
 
         const threat = computeThreatLevel(nearby, weather);

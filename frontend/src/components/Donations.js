@@ -15,7 +15,7 @@ function Donations() {
         amount: '',
         disaster_report_id: '',
         message: '',
-        payment_method: 'razorpay'
+        payment_method: 'upi'
     });
     const [processing, setProcessing] = useState(false);
     const [upiDetails, setUpiDetails] = useState(null);
@@ -84,7 +84,7 @@ function Donations() {
             // Close modal and form
             setShowUpiModal(false);
             setUpiDetails(null);
-            setFormData(prev => ({ ...prev, donor_name: '', donor_email: '', amount: '', disaster_report_id: '', message: '', payment_method: 'razorpay' }));
+            setFormData(prev => ({ ...prev, donor_name: '', donor_email: '', amount: '', disaster_report_id: '', message: '', payment_method: 'upi' }));
             setShowForm(false);
             
             // Fetch and update donations list
@@ -118,60 +118,16 @@ function Donations() {
                 amount: parseFloat(formData.amount)
             });
 
-            if (formData.payment_method === 'upi') {
-                // Handle UPI payment
-                if (res.data.upiDetails) {
-                    setUpiDetails({
-                        ...res.data.upiDetails,
-                        donationId: res.data.donationId
-                    });
-                    setShowUpiModal(true);
-                    setFormData(prev => ({ ...prev, donor_name: '', donor_email: '', amount: '', disaster_report_id: '', message: '', payment_method: 'razorpay' }));
-                    setShowForm(false);
-                }
-            } else if (res.data.mock) {
-                // Test mode - no Razorpay configured
-                alert('Donation recorded successfully! (Test Mode - Razorpay not configured)');
+            if (res.data.upiDetails) {
+                setUpiDetails({
+                    ...res.data.upiDetails,
+                    donationId: res.data.donationId
+                });
+                setShowUpiModal(true);
+                setFormData(prev => ({ ...prev, donor_name: '', donor_email: '', amount: '', disaster_report_id: '', message: '', payment_method: 'upi' }));
                 setShowForm(false);
-                setFormData(prev => ({ ...prev, donor_name: '', donor_email: '', amount: '', disaster_report_id: '', message: '', payment_method: 'razorpay' }));
-                fetchData();
-            } else if (res.data.orderId) {
-                // Open Razorpay checkout
-                const options = {
-                    key: res.data.key_id,
-                    amount: res.data.amount,
-                    currency: res.data.currency,
-                    name: 'Crisis Management System',
-                    description: 'Disaster Relief Donation',
-                    order_id: res.data.orderId,
-                    handler: async function (response) {
-                        try {
-                            await donationsAPI.verify({
-                                razorpay_order_id: response.razorpay_order_id,
-                                razorpay_payment_id: response.razorpay_payment_id,
-                                razorpay_signature: response.razorpay_signature
-                            });
-                            alert('Donation successful! Thank you for your generosity.');
-                            setShowForm(false);
-                            setFormData(prev => ({ ...prev, donor_name: '', donor_email: '', amount: '', disaster_report_id: '', message: '', payment_method: 'razorpay' }));
-                            fetchData();
-                        } catch (err) {
-                            alert('Payment verification failed.');
-                        }
-                    },
-                    prefill: {
-                        name: formData.donor_name,
-                        email: formData.donor_email
-                    },
-                    theme: { color: '#e74c3c' }
-                };
-
-                if (window.Razorpay) {
-                    const rzp = new window.Razorpay(options);
-                    rzp.open();
-                } else {
-                    alert('Razorpay SDK not loaded. Please refresh and try again.');
-                }
+            } else {
+                alert('Could not generate UPI payment details. Please try again.');
             }
         } catch (err) {
             console.error('Donation error:', err);
@@ -274,17 +230,13 @@ function Donations() {
                             <label>Payment Method</label>
                             <div className="payment-methods">
                                 <label className="payment-option">
-                                    <input type="radio" name="payment_method" value="razorpay" checked={formData.payment_method === 'razorpay'} onChange={handleChange} />
-                                    <span className="payment-option-label">💳 Card / Wallet (Razorpay)</span>
-                                </label>
-                                <label className="payment-option">
-                                    <input type="radio" name="payment_method" value="upi" checked={formData.payment_method === 'upi'} onChange={handleChange} />
-                                    <span className="payment-option-label">📱 UPI Payment</span>
+                                    <input type="radio" checked readOnly />
+                                    <span className="payment-option-label">📱 UPI QR Payment (Recommended)</span>
                                 </label>
                             </div>
                         </div>
                         <button type="submit" className="btn btn-success btn-block" disabled={processing}>
-                            {processing ? 'Processing...' : `${formData.payment_method === 'upi' ? '📱 Pay via UPI' : '💳 Proceed to Payment'} ${formData.amount ? formatCurrency(formData.amount) : ''}`}
+                            {processing ? 'Processing...' : `📱 Pay via UPI ${formData.amount ? formatCurrency(formData.amount) : ''}`}
                         </button>
                     </form>
                 </div>

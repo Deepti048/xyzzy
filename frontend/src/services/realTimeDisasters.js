@@ -5,11 +5,14 @@
  * - NASA EONET API (Earth Observatory Natural Event Tracking)
  */
 
-// USGS Earthquake API configuration
-const USGS_API = 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_hour.geojson';
+// USGS Earthquake API configuration (recent earthquakes)
+const USGS_API = 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson';
 
 // NASA EONET API configuration
-const EONET_API = 'https://eonet.gsfc.nasa.gov/api/v3/events';
+const EONET_API = 'https://eonet.gsfc.nasa.gov/api/v3/events?status=open&limit=200';
+
+const EARTHQUAKE_MAX_AGE_HOURS = 24;
+const EONET_MAX_AGE_DAYS = 7;
 
 /**
  * Map between NASA EONET category IDs and our disaster types
@@ -29,23 +32,29 @@ export const fetchEarthquakes = async () => {
         
         const data = await response.json();
         
+        const nowMs = Date.now();
+        const maxAgeMs = EARTHQUAKE_MAX_AGE_HOURS * 60 * 60 * 1000;
+
         // Parse earthquake features and convert to our format
-        return data.features.map(feature => ({
-            id: `usgs_${feature.id}`,
-            source: 'usgs',
-            category: 'earthquake',
-            title: feature.properties.title,
-            description: `Magnitude ${feature.properties.mag}`,
-            location_name: feature.properties.place || 'Unknown location',
-            latitude: feature.geometry.coordinates[1],
-            longitude: feature.geometry.coordinates[0],
-            severity: getSeverityFromMagnitude(feature.properties.mag),
-            magnitude: feature.properties.mag,
-            depth: feature.geometry.coordinates[2],
-            timestamp: new Date(feature.properties.time),
-            status: 'responding',
-            url: feature.properties.url
-        })).filter(eq => eq.magnitude >= 3.0); // Filter out minor earthquakes
+        return data.features
+            .map(feature => ({
+                id: `usgs_${feature.id}`,
+                source: 'usgs',
+                category: 'earthquake',
+                title: feature.properties.title,
+                description: `Magnitude ${feature.properties.mag}`,
+                location_name: feature.properties.place || 'Unknown location',
+                latitude: feature.geometry.coordinates[1],
+                longitude: feature.geometry.coordinates[0],
+                severity: getSeverityFromMagnitude(feature.properties.mag),
+                magnitude: feature.properties.mag,
+                depth: feature.geometry.coordinates[2],
+                timestamp: new Date(feature.properties.time),
+                status: 'active',
+                url: feature.properties.url
+            }))
+            .filter(eq => Number.isFinite(eq.magnitude) && eq.magnitude >= 3.0) // Filter out minor earthquakes
+            .filter(eq => nowMs - eq.timestamp.getTime() <= maxAgeMs); // Keep only very recent events
     } catch (error) {
         console.error('Error fetching earthquakes:', error);
         return [];
@@ -63,13 +72,17 @@ export const fetchNasaEvents = async () => {
         
         const data = await response.json();
         
+        const nowMs = Date.now();
+        const maxAgeMs = EONET_MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
+
         // Parse events and convert to our format
         return data.events
             .filter(event => event.geometries && event.geometries.length > 0)
             .map(event => {
-                const geometry = event.geometries[0]; // Get latest geometry
+                const geometry = event.geometries[event.geometries.length - 1]; // Latest geometry point
                 const categoryId = event.categories[0]?.id;
                 const category = EVENT_CATEGORY_MAP[categoryId] || 'other';
+                const timestamp = new Date(geometry.date || event.updated);
                 
                 return {
                     id: `eonet_${event.id}`,
@@ -81,11 +94,13 @@ export const fetchNasaEvents = async () => {
                     latitude: geometry.coordinates[1],
                     longitude: geometry.coordinates[0],
                     severity: 'medium', // NASA doesn't provide severity
-                    timestamp: new Date(event.geometry.date || event.updated),
-                    status: 'responding',
+                    timestamp,
+                    status: 'active',
                     url: event.link || ''
                 };
-            });
+            })
+            .filter(event => !Number.isNaN(event.timestamp.getTime()))
+            .filter(event => nowMs - event.timestamp.getTime() <= maxAgeMs);
     } catch (error) {
         console.error('Error fetching NASA events:', error);
         return [];

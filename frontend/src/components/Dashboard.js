@@ -163,7 +163,6 @@ function Dashboard() {
                             <span>💨 {(weatherData.wind?.speed || 0).toFixed(1)} m/s</span>
                             <span>📍 {weatherData.name || 'Your Area'}</span>
                         </div>
-                        {weatherData._mock && <small className="mock-badge">Demo Data</small>}
                     </div>
                 )}
 

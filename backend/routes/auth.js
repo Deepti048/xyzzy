@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const db = require('../config/db');
 
 const router = express.Router();
+const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_change_me';
 
 // Login
 router.post('/login', async (req, res) => {
@@ -29,7 +30,7 @@ router.post('/login', async (req, res) => {
         // Generate token
         const token = jwt.sign(
             { id: user.id, username: user.username, role: user.role },
-            process.env.JWT_SECRET,
+            JWT_SECRET,
             { expiresIn: '24h' }
         );
 
@@ -82,7 +83,7 @@ router.post('/register', async (req, res) => {
         // Generate token
         const token = jwt.sign(
             { id: result.insertId, username, role },
-            process.env.JWT_SECRET,
+            JWT_SECRET,
             { expiresIn: '24h' }
         );
 

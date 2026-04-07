@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
 import L from 'leaflet';
-import { disastersAPI, intelligenceAPI } from '../services/api';
-import socketService from '../services/socket';
+import { intelligenceAPI } from '../services/api';
 import { fetchAllDisasters } from '../services/realTimeDisasters';
 import { createMarkerIcon, createUserLocationIcon } from './mapHelpers';
 import RealTimeControls from './RealTimeControls';
@@ -65,14 +64,11 @@ function RoutingDisplay({ from, to, onClear }) {
 
 /**
  * MapDashboard - Main map component for viewing disasters globally
- * Shows both local database disasters and real-time public API data
+ * Shows only real-time global disaster feeds
  */
 function MapDashboard() {
-    // Local database disasters
-    const [disasters, setDisasters] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedCategory, setSelectedCategory] = useState('all');
-    const [stats, setStats] = useState({ total: 0, critical: 0, responding: 0 });
 
     // User location and routing
     const [userLocation, setUserLocation] = useState(null);
@@ -80,7 +76,6 @@ function MapDashboard() {
 
     // Real-time API data
     const [realTimeDisasters, setRealTimeDisasters] = useState([]);
-    const [showRealTime, setShowRealTime] = useState(true);
     const [realTimeLoading, setRealTimeLoading] = useState(false);
     const [lastUpdateTime, setLastUpdateTime] = useState(null);
     const [apiErrors, setApiErrors] = useState({ usgs: false, eonet: false });
@@ -104,35 +99,14 @@ function MapDashboard() {
             setApiErrors({ usgs: true, eonet: true });
         } finally {
             setRealTimeLoading(false);
-        }
-    };
-
-    const fetchDisasters = async () => {
-        try {
-            const res = await disastersAPI.getAll();
-            setDisasters(res.data);
-        } catch (err) {
-            console.error('Error fetching disasters:', err);
-        } finally {
             setLoading(false);
-        }
-    };
-
-    const fetchStats = async () => {
-        try {
-            const res = await disastersAPI.getStats();
-            setStats(res.data);
-        } catch (err) {
-            console.error('Error fetching stats:', err);
         }
     };
 
     // ===== INITIALIZATION & CLEANUP =====
 
     useEffect(() => {
-        // Fetch initial data
-        fetchDisasters();
-        fetchStats();
+        // Fetch initial real-time data
         fetchRealTimeDisasters();
 
         // Auto-refresh real-time data every 45 seconds
@@ -156,25 +130,8 @@ function MapDashboard() {
             );
         }
 
-        // Listen for real-time disaster updates via Socket.io
-        socketService.onDisasterCreated((d) => {
-            setDisasters(prev => [d, ...prev]);
-            fetchStats();
-        });
-
-        socketService.onDisasterUpdated((d) => {
-            setDisasters(prev => prev.map(item => item.id === d.id ? d : item));
-            fetchStats();
-        });
-
-        socketService.onDisasterDeleted(({ id }) => {
-            setDisasters(prev => prev.filter(item => item.id !== id));
-            fetchStats();
-        });
-
         return () => {
             if (autoRefreshRef.current) clearInterval(autoRefreshRef.current);
-            socketService.offDisasterEvents();
         };
     }, []);
 
@@ -190,12 +147,34 @@ function MapDashboard() {
 
     // ===== FILTERING =====
 
-    const combined = [...disasters, ...(showRealTime ? realTimeDisasters : [])];
+    const dedupeDisasters = (items) => {
+        const seen = new Set();
+        return items.filter((item) => {
+            const lat = Number(item.latitude);
+            const lng = Number(item.longitude);
+            const roundedLat = Number.isFinite(lat) ? lat.toFixed(3) : 'na';
+            const roundedLng = Number.isFinite(lng) ? lng.toFixed(3) : 'na';
+            const title = (item.title || '').toLowerCase().trim();
+            const location = (item.location_name || '').toLowerCase().trim();
+            const key = `${roundedLat}|${roundedLng}|${title}|${location}`;
+
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
+    };
+
+    const combined = dedupeDisasters(realTimeDisasters);
     const filtered = combined.filter(d => {
-        const statusOk = d.status !== 'resolved';
         const categoryOk = selectedCategory === 'all' || d.category === selectedCategory;
-        return statusOk && categoryOk;
+        return categoryOk;
     });
+
+    const stats = {
+        total: combined.length,
+        critical: combined.filter(d => d.severity === 'critical').length,
+        responding: combined.filter(d => d.status === 'active' || d.status === 'responding').length
+    };
 
     if (loading) return <div className="loading">📍 Loading map...</div>;
 
@@ -215,8 +194,7 @@ function MapDashboard() {
 
             {/* ===== REAL-TIME CONTROLS ===== */}
             <RealTimeControls
-                showRealTime={showRealTime}
-                onToggleRealTime={setShowRealTime}
+                showRealTime={true}
                 realTimeLoading={realTimeLoading}
                 lastUpdateTime={lastUpdateTime}
                 onRefresh={fetchRealTimeDisasters}
@@ -246,7 +224,7 @@ function MapDashboard() {
             <CategoryFilter
                 selectedCategory={selectedCategory}
                 onCategoryChange={setSelectedCategory}
-                showRealTime={showRealTime}
+                showRealTime={true}
             />
 
             {/* ===== ROUTE ACTIVE BANNER ===== */}
@@ -337,7 +315,7 @@ function MapDashboard() {
             </div>
 
             {/* ===== LEGEND ===== */}
-            <MapLegend showRealTime={showRealTime} />
+            <MapLegend showRealTime={true} />
         </div>
     );
 }

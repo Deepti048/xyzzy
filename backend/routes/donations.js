@@ -19,6 +19,27 @@ function getRazorpay() {
     return razorpay;
 }
 
+function buildUpiPayload({ amount, reference }) {
+    const upiId = process.env.UPI_ID || 'crisismanagement@upi';
+    const upiName = process.env.UPI_NAME || 'Crisis Management';
+    const params = [
+        `pa=${encodeURIComponent(upiId)}`,
+        `pn=${encodeURIComponent(upiName)}`,
+        `tr=${encodeURIComponent(reference)}`,
+        `tn=${encodeURIComponent('Disaster Relief Donation')}`
+    ];
+
+    if (Number.isFinite(amount) && amount > 0) {
+        params.push(`am=${encodeURIComponent(amount.toFixed(2))}`);
+    }
+
+    return {
+        upiId,
+        upiName,
+        upiLink: `upi://pay?${params.join('&')}`
+    };
+}
+
 // Get donation stats (must be before /:id)
 router.get('/stats/summary', auth, async (req, res) => {
     try {
@@ -41,6 +62,32 @@ router.get('/config', auth, (req, res) => {
     });
 });
 
+// Get quick UPI QR for direct donations
+router.get('/upi-qr', auth, async (req, res) => {
+    try {
+        const requestedAmount = parseFloat(req.query.amount);
+        const amount = Number.isFinite(requestedAmount) && requestedAmount > 0 ? requestedAmount : null;
+        const reference = `QRDON${Date.now()}`;
+        const upiPayload = buildUpiPayload({ amount, reference });
+        const qrCode = await QRCode.toDataURL(upiPayload.upiLink);
+
+        res.json({
+            success: true,
+            upiDetails: {
+                upiId: upiPayload.upiId,
+                upiName: upiPayload.upiName,
+                amount,
+                reference,
+                qrCode,
+                upiLink: upiPayload.upiLink
+            }
+        });
+    } catch (error) {
+        console.error('Get UPI QR error:', error);
+        res.status(500).json({ error: 'Failed to generate UPI QR' });
+    }
+});
+
 // Create donation order
 router.post('/create-order', auth, async (req, res) => {
     try {
@@ -48,13 +95,15 @@ router.post('/create-order', auth, async (req, res) => {
 
         if (payment_method === 'upi') {
             // Handle UPI payment
-            const upiId = process.env.UPI_ID || 'crisismanagement@upi';
-            const upiName = process.env.UPI_NAME || 'Crisis Management';
             const reference = `DonUPI${Date.now()}`;
 
             // Generate UPI string and QR code
-            const upiString = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(upiName)}&tr=${reference}&tn=Donation&am=${amount}`;
-            const qrCode = await QRCode.toDataURL(upiString);
+            const parsedAmount = parseFloat(amount);
+            const upiPayload = buildUpiPayload({
+                amount: Number.isFinite(parsedAmount) ? parsedAmount : null,
+                reference
+            });
+            const qrCode = await QRCode.toDataURL(upiPayload.upiLink);
 
             // Insert donation record with UPI details (status = 'created' - waiting for payment)
             const [result] = await db.query(
@@ -65,12 +114,12 @@ router.post('/create-order', auth, async (req, res) => {
             return res.json({
                 success: true,
                 upiDetails: {
-                    upiId: upiId,
-                    upiName: upiName,
+                    upiId: upiPayload.upiId,
+                    upiName: upiPayload.upiName,
                     amount: amount,
                     reference: reference,
                     qrCode: qrCode,
-                    upiLink: upiString
+                    upiLink: upiPayload.upiLink
                 },
                 donationId: result.insertId
             });

@@ -97,6 +97,7 @@ export const donationsAPI = {
     getAll: () => api.get('/donations'),
     getStats: () => api.get('/donations/stats/summary'),
     getConfig: () => api.get('/donations/config'),
+    getUpiQr: (amount) => api.get('/donations/upi-qr', { params: { amount } }),
     createOrder: (data) => api.post('/donations/create-order', data),
     verify: (data) => api.post('/donations/verify', data),
     verifyUpi: (data) => api.post('/donations/verify-upi', data),
